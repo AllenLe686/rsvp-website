@@ -1,5 +1,5 @@
 //Section 1: Imports necessary tools to communicate with RDS
-import mysql from 'mysql12/promise';
+import mysql from 'mysql2/promise';
 import {
   DynamoDBClient,
   BatchGetItemCommand,
@@ -9,7 +9,7 @@ import {
   TransactWriteItemsCommand
 } from "@aws-sdk/client-dynamodb";
 
-const dynamo = new DynamoDBClient({ region: ProcessingInstruction.env.REGION });
+const dynamo = new DynamoDBClient({ region: process.env.REGION });
 
 //Section 2: Creates a handler function to send all necessary info from a request
 export const handler = async (event) => {
@@ -68,14 +68,14 @@ export const handler = async (event) => {
       }));
 
       const result = await dynamo.send(new BatchGetItemCommand({
-        RequestItems: { "event-rsvp-counts": { Keys: keys } }
+        RequestItems: { "event-rsvp-respones": { Keys: keys } }
       }));
 
-      const items = result.Responses?.["event-rsvp-counts"] || [];
+      const items = result.Responses?.["event-rsvp-respones"] || [];
       const counts = { Yes: 0, No: 0 };
       for (const item of items) {
         const key = item.sk.S.split("#")[1];
-        const [key] = Number(item.count?.N || 0);
+        counts[key] = Number(item.count?.N || 0);
       }
 
       return json(counts);
@@ -101,7 +101,7 @@ export const handler = async (event) => {
           TransactItems: [
             {
               Put: {
-                TableName: "event-rsvp-counts",
+                TableName: "event-rsvp-respones",
                 Item: {
                   pk: { S: 'EVENT#${event_id}' },
                   sk: { S: 'RESPONDENT#${email}' }, //uniqueness per event+email
@@ -115,7 +115,7 @@ export const handler = async (event) => {
             },
             {
               Update: {
-                TableName: "event-rsvp-counts",
+                TableName: "event-rsvp-respones",
                 Key: {
                   pk: { S: 'EVENT#${event_id}' },
                   sk: { S: 'RESPONSE#${response}' },
@@ -160,7 +160,7 @@ export const handler = async (event) => {
       }
 
       const result = await dynamo.send(new QueryCommand({
-        TableName: "event-rsvp-counts",
+        TableName: "event-rsvp-respones",
         KeyConditionExpression: keyCondition,
         ExpressionAttributeValues: expressionValues
       }));
